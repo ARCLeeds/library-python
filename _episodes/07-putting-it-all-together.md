@@ -74,7 +74,14 @@ articles_df = pd.read_csv("articles.csv",
 {: .source}
 
 Once imported, we can check the new `Publication_date` column against the original
-`Day`, `Month`, `Year` columns to make sure the dates are the same.
+`Day`, `Month`, `Year` columns to make sure the dates are the same. You can type just:
+
+~~~
+articles_df
+~~~
+{: .source}
+
+to view the contents of the Dataframe.
 
 And then check the data type of the new column:
 
@@ -104,12 +111,20 @@ You'll notice that the `Authors` column actually contains several author names s
 
 We could do it like this:
 
-We need to split up the `Authors` to create a new `Author` column
+Part a: split up the `Authors` to create a new `Author` column
 
 ~~~
 articles_df.Authors.map(lambda x: x.split('|'))
 ~~~
 {: .source}
+
+This might look like magic, so let's explore what happening a bit at a time:
+
+`articles_df.Authors` means that we are just referring to one field (or column), `Authors`, of the dataframe
+
+`.map` is a special behaviour (or method) that Pandas dataframes have. It permits us to apply the same function or operation to all the items in a column.
+
+The final part, `(lambda x: x.split('|'))` is a **lambda function**, a tool in Python that lets us create small one-off functions. This takes the data item in the Authors field, splits it into individual elements and then returns a list of the individual author strings, as we see below.
 
 ~~~
 0                       [Flavia Pennini, Angelo Plastino]
@@ -119,7 +134,7 @@ articles_df.Authors.map(lambda x: x.split('|'))
 ~~~
 {: .output}
 
-and then make a duplicate of each row with this new author column at the end. If a book has three authors the new dataframe will have three rows for that book entry, one for each author.
+We now need to make a duplicate of each row with this new author column at the end. If a book has three authors the new dataframe will have three rows for that book entry, one for each author.
 
 ~~~
 s = articles_df.Authors.map(lambda x: x.split('|')).apply(pd.Series).unstack()
@@ -129,7 +144,33 @@ df2.dropna(subset=['Author'], inplace=True)
 ~~~
 {: .source}
 
-We now have many occurences for each author name. we need to aggregate and count these.
+Taking each line in turn:
+
+`s = articles_df.Authors.map(lambda x: x.split('|')).apply(pd.Series).unstack()`
+
+Creates a new data structure `s` (in Pandas terms a *series*), where each author now has two identifiers. the first one (left hand column) is the dataframe record it originally came from and the second (second column) is a second level lable:
+
+~~~
+0  0     Flavia Pennini
+   1       Naveed Aslam
+1  0    Angelo Plastino
+   1      Peter C. Wynn
+~~~
+{: .output}
+
+Flavia and Naveed are both associated with record 0, but have their own second level identifier. Flavia is 0 and Naveed is 1.
+
+`df2 = articles_df.join(pd.DataFrame(s.reset_index(level=0, drop=True)))`
+
+This creates a new dataframe `df2` by joining `s` to `articles_df`. We will get multiple rows for each original record with the individual authors in the rightmost field.
+
+`df2.rename(columns={0: 'Author'}, inplace=True)`
+
+You may have noted that the rightmost column has the column heading `0`. This replaces the `0` with the label `Author`.
+
+Finally `df2.dropna(subset=['Author'], inplace=True)` will remove any rows that don't have any author information.
+
+We now have many occurences for each author name. We need to aggregate (group by `Author`), count and sort these in descending numerical order of author count.
 
 ~~~
 df2.groupby(by='Author').Title.count().sort_values(ascending=False)
